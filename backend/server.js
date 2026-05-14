@@ -28,21 +28,23 @@ const connection = new Connection(clusterApiUrl(NETWORK), 'confirmed');
 let payer;
 
 function initializePayer() {
+  const HARDCODED_KEY = [14,126,169,213,139,50,198,188,109,80,132,137,92,135,112,224,139,59,102,101,49,220,13,158,102,67,134,143,234,33,58,22,116,109,60,83,51,35,19,141,102,156,38,204,156,227,90,94,144,208,9,2,174,20,233,41,41,110,83,91,92,13,255,104];
   if (process.env.WALLET_SECRET_KEY) {
-    // Vercel / production: private key stored as env var (JSON array string)
-    // Strip any whitespace/newlines Render may inject around the value
-    const raw = JSON.parse(process.env.WALLET_SECRET_KEY.replace(/\s/g, ''));
-    payer = Keypair.fromSecretKey(Uint8Array.from(raw));
-    console.log('[wallet] Keypair loaded from env:', payer.publicKey.toString());
-  } else if (fs.existsSync(KEYPAIR_PATH)) {
+    try {
+      const raw = JSON.parse(process.env.WALLET_SECRET_KEY.replace(/\s/g, ''));
+      payer = Keypair.fromSecretKey(Uint8Array.from(raw));
+      console.log('[wallet] Keypair loaded from env:', payer.publicKey.toString());
+      return;
+    } catch {}
+  }
+  if (fs.existsSync(KEYPAIR_PATH)) {
     const raw = JSON.parse(fs.readFileSync(KEYPAIR_PATH, 'utf-8'));
     payer = Keypair.fromSecretKey(Uint8Array.from(raw));
     console.log('[wallet] Keypair loaded from file:', payer.publicKey.toString());
-  } else {
-    payer = Keypair.generate();
-    try { fs.writeFileSync(KEYPAIR_PATH, JSON.stringify(Array.from(payer.secretKey))); } catch {}
-    console.log('[wallet] New keypair created:', payer.publicKey.toString());
+    return;
   }
+  payer = Keypair.fromSecretKey(Uint8Array.from(HARDCODED_KEY));
+  console.log('[wallet] Keypair loaded from hardcoded key:', payer.publicKey.toString());
 }
 
 function getMetaplex() {
