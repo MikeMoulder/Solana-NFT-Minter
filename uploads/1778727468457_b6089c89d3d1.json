@@ -1,0 +1,21 @@
+{
+  "name": "ero",
+  "symbol": "ERO",
+  "description": "my fave",
+  "image": "http://localhost:3001/uploads/1778727468456_8191fc99206c.png",
+  "attributes": [
+    {
+      "trait_type": "Created",
+      "value": "2026-05-14T02:57:48.457Z"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "http://localhost:3001/uploads/1778727468456_8191fc99206c.png",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+  }
+}

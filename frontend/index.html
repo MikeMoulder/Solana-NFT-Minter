@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFT Minter — Solana</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#080808;--bg-2:#0e0e0e;--bg-3:#161616;--bg-4:#1c1c1c;
+      --border:#1f1f1f;--border-2:#282828;--border-hi:#3a3a3a;
+      --accent:#9945FF;--accent-dim:rgba(153,69,255,.10);--accent-hi:rgba(153,69,255,.18);
+      --green:#14F195;--green-dim:rgba(20,241,149,.08);--green-hi:rgba(20,241,149,.15);
+      --text:#E8E8E8;--text-2:#888;--text-3:#4a4a4a;
+      --error:#F75A5A;--error-dim:rgba(247,90,90,.08);
+      --warn:#FFB800;--warn-dim:rgba(255,184,0,.08);
+      --radius:2px;--mono:'JetBrains Mono','Courier New',monospace
+    }
+    html{color-scheme:dark}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-2)}
+    a{color:inherit;text-decoration:none}button{font-family:inherit}
+    .app{display:flex;flex-direction:column;min-height:100vh}
+
+    /* Header */
+    .header{position:sticky;top:0;z-index:200;height:54px;background:var(--bg);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:9px;user-select:none}
+    .brand-icon{color:var(--accent);flex-shrink:0}
+    .brand-name{font-size:14px;font-weight:600;letter-spacing:-.01em}
+    .header-right{display:flex;align-items:center;gap:10px}
+    .net-pill{display:flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid var(--border-2);background:var(--bg-3);border-radius:var(--radius);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-2)}
+    .net-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2.5s ease-in-out infinite}
+    .net-dot.off{background:var(--error);animation:none}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .btn-connect{display:flex;align-items:center;gap:7px;padding:6px 13px;border:1px solid var(--border-2);background:var(--bg-3);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;border-radius:var(--radius);transition:border-color .15s,background .15s;white-space:nowrap}
+    .btn-connect:hover{border-color:var(--border-hi);background:var(--bg-4)}
+    .btn-connect.live{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+    .btn-connect.live:hover{background:var(--accent-hi)}
+
+    /* Wallet Panel */
+    .wallet-overlay{display:none;position:fixed;inset:0;z-index:199}
+    .wallet-overlay.open{display:block}
+    .wallet-panel{position:absolute;top:56px;right:20px;width:292px;background:var(--bg-2);border:1px solid var(--border-2);border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.7);overflow:hidden;z-index:200}
+    .wp-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+    .wp-title{font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.05em;text-transform:uppercase}
+    .wp-close{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-2);cursor:pointer;border-radius:var(--radius);font-size:16px;line-height:1}
+    .wp-close:hover{color:var(--text);background:var(--bg-3)}
+    .wallet-list{padding:6px;display:flex;flex-direction:column;gap:2px}
+    .wallet-item{display:flex;align-items:center;gap:11px;padding:9px 10px;background:none;border:1px solid transparent;cursor:pointer;border-radius:var(--radius);text-align:left;width:100%;transition:background .1s,border-color .1s}
+    .wallet-item:hover:not(:disabled){background:var(--bg-3);border-color:var(--border)}
+    .w-logo{width:34px;height:34px;border-radius:var(--radius);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .w-logo svg{width:34px;height:34px;display:block}
+    .w-info{flex:1;min-width:0}
+    .w-name{font-size:13px;font-weight:500;color:var(--text)}
+    .w-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+    .w-badge{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:var(--radius);flex-shrink:0}
+    .w-badge.found{background:var(--green-dim);color:var(--green);border:1px solid rgba(20,241,149,.18)}
+    .w-badge.install{background:var(--bg-3);color:var(--text-3);border:1px solid var(--border)}
+    .w-badge.active{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(153,69,255,.2)}
+    .wp-footer{padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-3);text-align:center}
+
+    /* Main */
+    .main{flex:1;max-width:620px;width:100%;margin:0 auto;padding:24px 20px 64px;display:flex;flex-direction:column;gap:14px}
+
+    /* Status bar */
+    .status-bar{display:grid;grid-template-columns:1fr 1fr auto;align-items:center;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-2);overflow:hidden}
+    .sbar-item{padding:12px 16px;border-right:1px solid var(--border)}
+    .sbar-item:last-of-type{border-right:none}
+    .sbar-label{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:3px}
+    .sbar-val{font-size:13px;font-weight:500;color:var(--text);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sbar-val.big{font-size:15px;font-family:'Inter',sans-serif;font-weight:600}
+    .sbar-val.dim{color:var(--text-2)}
+    .sbar-action{padding:12px 14px;flex-shrink:0}
+    .btn-airdrop{padding:6px 12px;border:1px solid var(--border-2);background:var(--bg-3);color:var(--text-2);font-size:11px;font-weight:500;cursor:pointer;border-radius:var(--radius);transition:all .15s;white-space:nowrap}
+    .btn-airdrop:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+    .btn-airdrop:disabled{opacity:.4;cursor:not-allowed}
+
+    /* Card */
+    .card{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-2);overflow:hidden}
+    .card-head{padding:16px 18px;border-bottom:1px solid var(--border)}
+    .card-head h2{font-size:15px;font-weight:600;letter-spacing:-.01em}
+    .card-head p{font-size:11px;color:var(--text-2);margin-top:2px}
+    .card-body{padding:18px;display:flex;flex-direction:column;gap:14px}
+
+    /* Upload */
+    .upload-zone{position:relative;border:1px dashed var(--border-2);border-radius:var(--radius);min-height:130px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .15s,background .15s}
+    .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:var(--accent-dim)}
+    .upload-ph{display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px;text-align:center;pointer-events:none}
+    .u-icon{color:var(--text-3);margin-bottom:2px}
+    .u-label{font-size:13px;font-weight:500;color:var(--text-2)}
+    .u-hint{font-size:11px;color:var(--text-3)}
+    .upload-preview{width:100%;max-height:220px;object-fit:contain;background:var(--bg-3);display:block}
+    .upload-preview.hidden{display:none}
+    .upload-change{position:absolute;bottom:8px;right:8px;display:none;padding:4px 9px;font-size:10px;font-weight:600;background:rgba(0,0,0,.75);border:1px solid var(--border-2);color:var(--text-2);cursor:pointer;border-radius:var(--radius);letter-spacing:.03em}
+    .upload-zone:hover .upload-change{display:block}
+
+    /* Fields */
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field label{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3)}
+    .field label .opt{font-weight:400;text-transform:none;letter-spacing:0}
+    .field input,.field textarea{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-family:inherit;font-size:13px;outline:none;width:100%;transition:border-color .15s;-webkit-appearance:none}
+    .field input::placeholder,.field textarea::placeholder{color:var(--text-3)}
+    .field input:focus,.field textarea:focus{border-color:var(--border-hi)}
+    .field textarea{resize:vertical;min-height:76px;line-height:1.5}
+    .dest-field{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:12px;font-family:var(--mono);color:var(--text-2);display:flex;align-items:center;gap:8px;min-height:36px}
+    .dest-dot{width:5px;height:5px;border-radius:50%;background:var(--text-3);flex-shrink:0}
+    .dest-field.live .dest-dot{background:var(--green)}
+    .dest-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* Alert */
+    .alert{padding:9px 12px;border-radius:var(--radius);font-size:12px;line-height:1.5;border:1px solid transparent}
+    .alert.hidden{display:none}
+    .alert.error{background:var(--error-dim);color:var(--error);border-color:rgba(247,90,90,.18)}
+    .alert.success{background:var(--green-dim);color:var(--green);border-color:rgba(20,241,149,.18)}
+    .alert.info{background:var(--accent-dim);color:#C4A4FF;border-color:rgba(153,69,255,.18)}
+    .alert.warn{background:var(--warn-dim);color:var(--warn);border-color:rgba(255,184,0,.18)}
+
+    /* Buttons */
+    .btn-row{display:flex;gap:10px}
+    .btn-mint{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;background:var(--accent);border:1px solid var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;border-radius:var(--radius);transition:background .15s,border-color .15s;letter-spacing:.01em}
+    .btn-mint:hover:not(:disabled){background:#A855FF;border-color:#A855FF}
+    .btn-mint:disabled{opacity:.4;cursor:not-allowed}
+    .btn-ghost{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;background:var(--bg-3);border:1px solid var(--border-2);color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;border-radius:var(--radius);transition:border-color .15s,color .15s}
+    .btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+    .btn-green{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;background:var(--green-dim);border:1px solid rgba(20,241,149,.2);color:var(--green);font-size:13px;font-weight:500;cursor:pointer;border-radius:var(--radius);text-decoration:none;transition:background .15s,border-color .15s}
+    .btn-green:hover{background:var(--green-hi);border-color:rgba(20,241,149,.35)}
+
+    /* Loading */
+    .loading-wrap{border-top:1px solid var(--border);overflow:hidden}
+    .loading-wrap.hidden{display:none}
+    .loading-track{height:2px;background:var(--border)}
+    .loading-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));animation:sweep 1.6s ease-in-out infinite;width:38%}
+    @keyframes sweep{0%{margin-left:-38%}100%{margin-left:140%}}
+    .loading-txt{font-size:11px;color:var(--text-2);text-align:center;padding:10px 0 14px}
+
+    /* Success */
+    .success-card{display:none}
+    .success-card.show{display:block}
+    .success-head{display:flex;align-items:center;gap:12px;padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+    .success-icon{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green-dim);border:1px solid rgba(20,241,149,.2);border-radius:var(--radius);color:var(--green)}
+    .success-head h2{font-size:15px;font-weight:600}
+    .success-head p{font-size:11px;color:var(--text-2);margin-top:2px}
+    .result-rows{padding:14px 18px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--border)}
+    .result-row{display:flex;flex-direction:column;gap:5px}
+    .result-label{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+    .result-val{display:flex;align-items:center;gap:7px}
+    .result-val .mono{font-family:var(--mono);font-size:11px;color:var(--text);word-break:break-all;flex:1}
+    .btn-copy{padding:4px;display:flex;align-items:center;justify-content:center;background:var(--bg-3);border:1px solid var(--border);color:var(--text-2);cursor:pointer;border-radius:var(--radius);transition:all .1s;flex-shrink:0}
+    .btn-copy:hover{color:var(--text);border-color:var(--border-hi)}
+    .success-actions{padding:14px 18px;display:flex;gap:10px}
+
+    @media(max-width:480px){
+      .main{padding:14px 12px 48px}
+      .row{grid-template-columns:1fr}
+      .btn-row,.success-actions{flex-direction:column}
+      .status-bar{grid-template-columns:1fr 1fr}
+      .sbar-item{border-right:none;border-bottom:1px solid var(--border)}
+      .wallet-panel{right:12px;width:calc(100vw - 24px)}
+      .header{padding:0 12px}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <span class="brand-name">NFT Minter</span>
+    </div>
+    <div class="header-right">
+      <div class="net-pill">
+        <span class="net-dot" id="netDot"></span>
+        <span id="netLabel">devnet</span>
+      </div>
+      <button class="btn-connect" id="connectBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+          <rect x="2" y="7" width="20" height="14"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+        </svg>
+        <span id="connectLabel">Connect Wallet</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="wallet-overlay" id="walletOverlay">
+    <div class="wallet-panel" id="walletPanel">
+      <div class="wp-head">
+        <span class="wp-title">Select Wallet</span>
+        <button class="wp-close" id="walletClose">&#x2715;</button>
+      </div>
+      <div class="wallet-list">
+
+        <button class="wallet-item" data-wallet="phantom" id="phantomBtn">
+          <div class="w-logo">
+            <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="34" height="34" fill="#4B3B8C"/>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M17 7C11.48 7 7 11.48 7 17v8.5l2.5-1.8 2 1.8 2-1.8 2 1.8 2-1.8 2 1.8 2.5-1.8V17C27 11.48 22.52 7 17 7Z" fill="white"/>
+              <circle cx="13.5" cy="17" r="1.8" fill="#4B3B8C"/>
+              <circle cx="20.5" cy="17" r="1.8" fill="#4B3B8C"/>
+            </svg>
+          </div>
+          <div class="w-info">
+            <div class="w-name">Phantom</div>
+            <div class="w-sub">phantom.app</div>
+          </div>
+          <span class="w-badge install" id="phantomBadge">Install</span>
+        </button>
+
+        <button class="wallet-item" data-wallet="solflare" id="solflareBtn">
+          <div class="w-logo">
+            <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="34" height="34" fill="#FC8B24"/>
+              <circle cx="17" cy="17" r="5" fill="white"/>
+              <line x1="17" y1="7"  x2="17" y2="10" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="17" y1="24" x2="17" y2="27" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="7"  y1="17" x2="10" y2="17" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="24" y1="17" x2="27" y2="17" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="10.1" y1="10.1" x2="12.2" y2="12.2" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="21.8" y1="21.8" x2="23.9" y2="23.9" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="23.9" y1="10.1" x2="21.8" y2="12.2" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+              <line x1="12.2" y1="21.8" x2="10.1" y2="23.9" stroke="white" stroke-width="1.8" stroke-linecap="square"/>
+            </svg>
+          </div>
+          <div class="w-info">
+            <div class="w-name">Solflare</div>
+            <div class="w-sub">solflare.com</div>
+          </div>
+          <span class="w-badge install" id="solflareBadge">Install</span>
+        </button>
+
+        <button class="wallet-item" data-wallet="backpack" id="backpackBtn">
+          <div class="w-logo">
+            <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="34" height="34" fill="#E33E3F"/>
+              <rect x="12" y="8"  width="10" height="3" fill="white"/>
+              <rect x="10" y="11" width="14" height="14" fill="white"/>
+              <rect x="14" y="11" width="6"  height="5"  fill="#E33E3F"/>
+              <line x1="15" y1="20" x2="19" y2="20" stroke="#E33E3F" stroke-width="1.5" stroke-linecap="square"/>
+            </svg>
+          </div>
+          <div class="w-info">
+            <div class="w-name">Backpack</div>
+            <div class="w-sub">backpack.app</div>
+          </div>
+          <span class="w-badge install" id="backpackBadge">Install</span>
+        </button>
+
+      </div>
+      <div class="wp-footer">NFTs mint directly to your connected wallet</div>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <div class="status-bar">
+      <div class="sbar-item">
+        <div class="sbar-label">Balance</div>
+        <div class="sbar-val big" id="balanceVal">-- SOL</div>
+      </div>
+      <div class="sbar-item">
+        <div class="sbar-label">Address</div>
+        <div class="sbar-val dim" id="addressVal" style="max-width:200px">Loading...</div>
+      </div>
+      <div class="sbar-action">
+        <button class="btn-airdrop" id="airdropBtn">Airdrop 1 SOL</button>
+      </div>
+    </div>
+
+    <div class="alert hidden" id="globalAlert"></div>
+
+    <div class="card" id="mintCard">
+      <div class="card-head">
+        <h2>Create NFT</h2>
+        <p>Mint a new NFT on Solana devnet</p>
+      </div>
+      <form class="card-body" id="mintForm" novalidate>
+        <input type="file" id="imageInput" accept="image/*" hidden>
+
+        <div class="field">
+          <label>Artwork</label>
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-ph" id="uploadPh">
+              <svg class="u-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span class="u-label">Drop image here or click to browse</span>
+              <span class="u-hint">PNG, JPG, GIF &mdash; max 5 MB</span>
+            </div>
+            <img class="upload-preview hidden" id="uploadPreview" alt="Preview">
+            <button type="button" class="upload-change" id="uploadChange">Change</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Name</label>
+            <input type="text" id="nftName" placeholder="My NFT" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Symbol</label>
+            <input type="text" id="nftSymbol" placeholder="NFT" maxlength="10" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Description</label>
+          <textarea id="nftDesc" placeholder="Describe your NFT..."></textarea>
+        </div>
+
+        <div class="field" style="max-width:160px">
+          <label>Royalties <span class="opt">(%)</span></label>
+          <input type="number" id="nftRoyalties" value="5" min="0" max="50" step="0.5">
+        </div>
+
+        <div class="field">
+          <label>Destination</label>
+          <div class="dest-field" id="destField">
+            <span class="dest-dot"></span>
+            <span class="dest-text" id="destText">Backend wallet &mdash; connect a wallet to override</span>
+          </div>
+        </div>
+
+        <div class="alert hidden" id="formAlert"></div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn-mint" id="mintBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Mint NFT
+          </button>
+        </div>
+
+        <div class="loading-wrap hidden" id="loadingWrap">
+          <div class="loading-track"><div class="loading-fill"></div></div>
+          <div class="loading-txt" id="loadingTxt">Uploading image and metadata...</div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card success-card" id="successCard">
+      <div class="success-head">
+        <div class="success-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div>
+          <h2>NFT Minted</h2>
+          <p>Successfully created on Solana devnet</p>
+        </div>
+      </div>
+      <div class="result-rows">
+        <div class="result-row">
+          <div class="result-label">Mint Address</div>
+          <div class="result-val">
+            <span class="mono" id="resMint"></span>
+            <button type="button" class="btn-copy" id="copyMint" title="Copy address">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                <rect x="9" y="9" width="13" height="13"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="result-row">
+          <div class="result-label">Owner</div>
+          <div class="result-val"><span class="mono" id="resOwner"></span></div>
+        </div>
+        <div class="result-row">
+          <div class="result-label">Metadata URI</div>
+          <div class="result-val"><span class="mono" id="resUri"></span></div>
+        </div>
+      </div>
+      <div class="success-actions">
+        <a class="btn-green" id="explorerLink" target="_blank" rel="noopener">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          View on Explorer
+        </a>
+        <button type="button" class="btn-ghost" id="mintAnother">Mint Another</button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer style="text-align:center;padding:18px;font-size:12px;color:var(--text-3);border-top:1px solid var(--border)">
+    Built by <a href="https://x.com/moulderofweb3" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;font-weight:500">Rex</a>
+  </footer>
+</div>
+
+<script>
+  const API = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
+
+  const WALLETS = {
+    phantom: {
+      name: 'Phantom',
+      detect() { return window?.phantom?.solana ?? (window?.solana?.isPhantom ? window.solana : null); },
+      install: 'https://phantom.app/'
+    },
+    solflare: {
+      name: 'Solflare',
+      detect() { return window?.solflare?.isSolflare ? window.solflare : null; },
+      install: 'https://solflare.com/'
+    },
+    backpack: {
+      name: 'Backpack',
+      detect() { return window?.backpack?.isBackpack ? window.backpack : null; },
+      install: 'https://backpack.app/'
+    }
+  };
+
+  let connectedWallet = null;
+
+  const $ = id => document.getElementById(id);
+
+  function showAlert(el, msg, type = 'error') {
+    el.textContent = msg;
+    el.className = 'alert ' + type;
+  }
+  function hideAlert(el) { el.className = 'alert hidden'; }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    updateWalletBadges();
+    await checkHealth();
+    await refreshBalance();
+    setInterval(refreshBalance, 30000);
+    bindEvents();
+  });
+
+  async function checkHealth() {
+    try {
+      const r = await fetch(`${API}/health`);
+      if (!r.ok) throw new Error();
+      $('netDot').classList.remove('off');
+    } catch {
+      $('netDot').classList.add('off');
+      showAlert($('globalAlert'), 'Server offline. Run: npm start', 'error');
+    }
+  }
+
+  async function refreshBalance() {
+    try {
+      const addr = connectedWallet?.address;
+      const url  = addr ? `${API}/balance/${addr}` : `${API}/wallet`;
+      const data = await fetch(url).then(r => r.json());
+      $('balanceVal').textContent = `${(+data.balance).toFixed(4)} SOL`;
+      $('addressVal').textContent = truncate(addr || data.address);
+      if (+data.balance < 0.5 && !$('globalAlert').classList.contains('error')) {
+        showAlert($('globalAlert'), 'Low balance — request an airdrop to continue.', 'warn');
+      } else if (+data.balance >= 0.5) {
+        const ga = $('globalAlert');
+        if (ga.classList.contains('warn')) hideAlert(ga);
+      }
+    } catch {
+      $('balanceVal').textContent = '-- SOL';
+    }
+  }
+
+  function updateWalletBadges() {
+    for (const [key, w] of Object.entries(WALLETS)) {
+      const badge = $(`${key}Badge`);
+      const p = w.detect();
+      if (connectedWallet?.name === w.name) {
+        badge.textContent = 'Connected'; badge.className = 'w-badge active';
+      } else if (p) {
+        badge.textContent = 'Detected';  badge.className = 'w-badge found';
+      } else {
+        badge.textContent = 'Install';   badge.className = 'w-badge install';
+      }
+    }
+  }
+
+  function openWalletPanel()  { updateWalletBadges(); $('walletOverlay').classList.add('open'); }
+  function closeWalletPanel() { $('walletOverlay').classList.remove('open'); }
+
+  async function connectWallet(key) {
+    const w = WALLETS[key];
+    const provider = w.detect();
+    if (!provider) { window.open(w.install, '_blank', 'noopener'); closeWalletPanel(); return; }
+    try {
+      const resp    = await provider.connect();
+      const address = resp?.publicKey?.toString() || provider?.publicKey?.toString();
+      if (!address) throw new Error('Could not read public key');
+      connectedWallet = { name: w.name, address, provider };
+      $('connectBtn').classList.add('live');
+      $('connectLabel').textContent = truncate(address);
+      $('destField').classList.add('live');
+      $('destText').textContent = `${w.name}: ${truncate(address)}`;
+      updateWalletBadges();
+      closeWalletPanel();
+      await refreshBalance();
+      provider.on?.('disconnect', disconnectWallet);
+    } catch (err) {
+      if (err.code !== 4001) showAlert($('globalAlert'), `${w.name}: ${err.message}`, 'error');
+      closeWalletPanel();
+    }
+  }
+
+  function disconnectWallet() {
+    try { connectedWallet?.provider?.disconnect?.(); } catch {}
+    connectedWallet = null;
+    $('connectBtn').classList.remove('live');
+    $('connectLabel').textContent = 'Connect Wallet';
+    $('destField').classList.remove('live');
+    $('destText').textContent = 'Backend wallet \u2014 connect a wallet to override';
+    updateWalletBadges();
+    refreshBalance();
+  }
+
+  function handleFile(file) {
+    if (!file?.type.startsWith('image/')) { showAlert($('formAlert'), 'Please select a valid image file.', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024)      { showAlert($('formAlert'), 'Image must be under 5 MB.', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      $('uploadPreview').src = e.target.result;
+      $('uploadPreview').classList.remove('hidden');
+      $('uploadPh').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    hideAlert($('formAlert'));
+  }
+
+  async function handleMint(e) {
+    e.preventDefault();
+    hideAlert($('formAlert'));
+    const name = $('nftName').value.trim();
+    const sym  = $('nftSymbol').value.trim();
+    const desc = $('nftDesc').value.trim();
+    const roy  = $('nftRoyalties').value;
+    const file = $('imageInput').files[0];
+    if (!file) return showAlert($('formAlert'), 'Please upload an artwork image.', 'error');
+    if (!name) return showAlert($('formAlert'), 'Name is required.', 'error');
+    if (!sym)  return showAlert($('formAlert'), 'Symbol is required.', 'error');
+    if (!desc) return showAlert($('formAlert'), 'Description is required.', 'error');
+
+    const fd = new FormData();
+    fd.append('image', file); fd.append('name', name); fd.append('symbol', sym);
+    fd.append('description', desc); fd.append('royalties', roy || '5');
+    if (connectedWallet) fd.append('recipient', connectedWallet.address);
+
+    $('mintBtn').disabled = true;
+    $('loadingWrap').classList.remove('hidden');
+    $('loadingTxt').textContent = 'Uploading image and metadata...';
+
+    try {
+      const timer = setTimeout(() => { $('loadingTxt').textContent = 'Creating NFT on-chain...'; }, 3500);
+      const r    = await fetch(`${API}/mint`, { method: 'POST', body: fd });
+      clearTimeout(timer);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Minting failed');
+      showSuccess(data);
+    } catch (err) {
+      showAlert($('formAlert'), err.message, 'error');
+      $('mintBtn').disabled = false;
+    } finally {
+      $('loadingWrap').classList.add('hidden');
+    }
+  }
+
+  function showSuccess(data) {
+    $('resMint').textContent  = data.mint;
+    $('resOwner').textContent = data.owner;
+    $('resUri').textContent   = data.uri;
+    $('explorerLink').href    = `https://explorer.solana.com/address/${data.mint}?cluster=devnet`;
+    $('mintCard').style.display = 'none';
+    $('successCard').classList.add('show');
+    refreshBalance();
+  }
+
+  function resetForm() {
+    $('mintForm').reset();
+    $('uploadPreview').classList.add('hidden');
+    $('uploadPreview').src = '';
+    $('uploadPh').style.display = '';
+    $('imageInput').value = '';
+    hideAlert($('formAlert')); hideAlert($('globalAlert'));
+    $('mintBtn').disabled = false;
+    $('mintCard').style.display = '';
+    $('successCard').classList.remove('show');
+  }
+
+  async function handleAirdrop() {
+    $('airdropBtn').disabled = true;
+    showAlert($('globalAlert'), 'Requesting airdrop...', 'info');
+    try {
+      const r    = await fetch(`${API}/airdrop`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ address: connectedWallet?.address || null }) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Airdrop failed');
+      showAlert($('globalAlert'), `Airdrop successful — balance: ${(+data.balance).toFixed(4)} SOL`, 'success');
+      await refreshBalance();
+    } catch (err) {
+      showAlert($('globalAlert'), `Airdrop failed: ${err.message}`, 'error');
+    } finally {
+      $('airdropBtn').disabled = false;
+    }
+  }
+
+  function truncate(addr, h=5, t=4) {
+    if (!addr || addr.length <= h + t + 3) return addr;
+    return `${addr.slice(0,h)}...${addr.slice(-t)}`;
+  }
+
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    });
+  }
+
+  function bindEvents() {
+    $('connectBtn').addEventListener('click', () => connectedWallet ? disconnectWallet() : openWalletPanel());
+    $('walletOverlay').addEventListener('click', e => { if (e.target === $('walletOverlay')) closeWalletPanel(); });
+    $('walletClose').addEventListener('click', closeWalletPanel);
+    document.querySelectorAll('.wallet-item').forEach(btn => btn.addEventListener('click', () => connectWallet(btn.dataset.wallet)));
+    $('uploadZone').addEventListener('click', () => $('imageInput').click());
+    $('uploadChange').addEventListener('click', e => { e.stopPropagation(); $('imageInput').click(); });
+    $('imageInput').addEventListener('change', () => handleFile($('imageInput').files[0]));
+    $('uploadZone').addEventListener('dragover', e => { e.preventDefault(); $('uploadZone').classList.add('drag-over'); });
+    $('uploadZone').addEventListener('dragleave', () => $('uploadZone').classList.remove('drag-over'));
+    $('uploadZone').addEventListener('drop', e => {
+      e.preventDefault(); $('uploadZone').classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) { $('imageInput').files = e.dataTransfer.files; handleFile(e.dataTransfer.files[0]); }
+    });
+    $('mintForm').addEventListener('submit', handleMint);
+    $('airdropBtn').addEventListener('click', handleAirdrop);
+    $('copyMint').addEventListener('click', () => copyText($('resMint').textContent, $('copyMint')));
+    $('mintAnother').addEventListener('click', resetForm);
+  }
+</script>
+</body>
+</html>
