@@ -7,7 +7,7 @@
       "config": {
         "bundle": false,
         "maxDuration": 60,
-        "includeFiles": ["frontend/**", "node_modules/**"]
+        "includeFiles": ["frontend/**"]
       }
     }
   ],

@@ -30,7 +30,8 @@ let payer;
 function initializePayer() {
   if (process.env.WALLET_SECRET_KEY) {
     // Vercel / production: private key stored as env var (JSON array string)
-    const raw = JSON.parse(process.env.WALLET_SECRET_KEY);
+    // Strip any whitespace/newlines Render may inject around the value
+    const raw = JSON.parse(process.env.WALLET_SECRET_KEY.replace(/\s/g, ''));
     payer = Keypair.fromSecretKey(Uint8Array.from(raw));
     console.log('[wallet] Keypair loaded from env:', payer.publicKey.toString());
   } else if (fs.existsSync(KEYPAIR_PATH)) {
